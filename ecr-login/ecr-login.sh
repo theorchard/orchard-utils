@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+# Check for required cli tools
+if ! command -v aws > /dev/null; then
+    echo 'aws cli must be installed before running.'
+    exit 1
+fi
+AWS_CLI_VERSION=$(aws --version | cut -d' ' -f1 | cut -d'/' -f2 | cut -d'.' -f1)
+if ! command -v docker > /dev/null; then
+    echo 'docker must be installed before running.'
+    exit 1
+fi
+
+# Check that docker is running
+if ! docker ps > /dev/null 2>&1; then
+    echo 'docker daemon not found'
+    exit 1
+fi
+
+ACCOUNT_ID=$(aws sts get-caller-identity --output text --query 'Account' 2> /dev/null)
+if [[ -z "$ACCOUNT_ID" ]]; then
+    echo 'no account'
+    exit 1
+fi
+
+echo "Logging into account: $ACCOUNT_ID using aws-cli version $AWS_CLI_VERSION"
+if [[ "$AWS_CLI_VERSION" = "1" ]]; then
+    `aws ecr get-login --no-include-email --region us-east-1`
+elif [[ "$AWS_CLI_VERSION" = "2" ]]; then
+    TEMP_TOKEN=$(aws ecr --region=us-east-1 get-login-password)
+    if [[ -z "$TEMP_TOKEN" ]]; then
+        echo "Token not generated. Check AWS configuration."
+        exit 1
+    fi
+    echo "$TEMP_TOKEN" | docker login \
+        --username AWS \
+        --password-stdin "${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
+else
+    echo "Unknown aws-cli version $AWS_CLI_VERSION"
+    exit 1
+fi
