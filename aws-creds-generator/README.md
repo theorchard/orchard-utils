@@ -26,17 +26,17 @@ aws_secret_access_key = boo
 
 Example use of this script:
 ```
-. ./generate.sh
+. ./aws-session-login
 ```
 
 You may supply an optional param for the profile name, rather than providing it interactively:
 ```
-. ./generate.sh prod
+. ./aws-session-login prod
 ```
 
 You may also supply an optional second param for the one-time auth token, rather than providing it interactively, e.g.:
 ```
-. ./generate.sh prod 123987
+. ./aws-session-login prod 123987
 ```
 
 This script will create a new that will be stored as ```.store``` that will act as a master backup of your credentials. This will only be done if you're running this script for the first time. On subsequent uses of this script, it'll use that same ```.store``` file, and treat it the master source for your AWS credentials.
