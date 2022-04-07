@@ -1,62 +1,111 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Genearates temporary AWS credentials using your MFA device (12 hour duration).
+# Usage: ./aws-session-login [profile_name]
+#  - or to be prompted to enter the profile -
+# ./aws-session-login
 
-# Create a master file (.store) that will act as the source of your AWS Prod and Dev credentials
-if [ ! -f "${HOME}"/.aws/.store ]; then
-  if [ -f "${HOME}"/.aws/credentials ]; then
-    cp -a "${HOME}"/.aws/credentials "${HOME}"/.aws/.store
-    echo "Credentials have been backed up and stored in ${HOME}/.aws/.store"
-  else
-    echo "There is no credentials file located in ${HOME}/.aws/credentials" && exit 1
-  fi
-else
-# If the master file already exists, replace the configuration in credentials with .store, for AWS CLI to read your profile keys
-  cp -a "${HOME}"/.aws/.store "${HOME}"/.aws/credentials
+txtred=$(tput setaf 1)
+txtgreen=$(tput setaf 2)
+txtpurple=$(tput setaf 5)
+txtreset=$(tput sgr0)
+
+# Reset staged credentials
+unset AWS_ACCESS_KEY_ID
+unset AWS_SECRET_ACCESS_KEY
+unset AWS_SESSION_TOKEN
+unset AWS_DEFAULT_REGION
+
+# Load the known aws profiles
+if [ ! -f "${HOME}"/.aws/credentials ]; then
+    echo "There is no credentials file located in ${HOME}/.aws/credentials"
+    exit 1
 fi
+TMP_PROFILE_LIST=( $(grep ^\[[a-z]*\] "$HOME/.aws/credentials" | sed 's/^\[//g' | sed 's/\]$//g' | uniq | tr '\n' ' ') )
+
+# Check if the profile name was passed as an argument
+if [ -n "${1}" ]; then
+  FOUND_IN_LIST=0
+  for i in "${TMP_PROFILE_LIST[@]}"; do
+    if [ "${i}" = "${1}" ]; then
+      FOUND_IN_LIST=true
+    fi
+  done
+  if [ "${FOUND_IN_LIST}" != true ]; then
+    echo "AWS profile '${1}' not found."
+    exit 1
+  fi
+  TMP_AWS_PROFILE="${1}"
+fi
+
+if [ -z "${TMP_AWS_PROFILE}" ]; then
+  # Get the AWS profile from user input
+  echo "Select an AWS profile:"
+  COUNTER=0
+  for i in "${TMP_PROFILE_LIST[@]}"; do
+      ((COUNTER=COUNTER+1))
+      echo -e "$COUNTER) ${txtgreen}$i${txtreset}"
+  done
+  echo "-------------"
+  read -r -p "Enter profile number: " profile_index
+  ((profile_index=profile_index-1))
+  if [ "$profile_index" -lt 0 ] || [ -z "${TMP_PROFILE_LIST[$profile_index]}" ]; then
+      echo "Selected profile does not exist"
+      exit 1
+  fi
+  TMP_AWS_PROFILE="${TMP_PROFILE_LIST[$profile_index]}"
+fi
+OLD_AWS_PROFILE="${AWS_PROFILE}"
+export AWS_PROFILE="${TMP_AWS_PROFILE}"
 
 # Query IAM to get the username associated with the keys in the credentials file
 username=$(aws iam get-user --query 'User.[UserName]' --output text)
 if [ -z "${username}" ]
 then
-  echo "Can not identify who you are. "
-  return
+  export AWS_PROFILE="${OLD_AWS_PROFILE}"
+  echo "Cannot get profile name."
+  exit 1
 fi
-
-echo You are: ${username}
+echo "Profile found for:    ${txtgreen}${username}${txtreset}"
 
 # Query IAM to get the user's MFA device
 device=$(aws iam list-mfa-devices --user-name "${username}" --query 'MFADevices[*].SerialNumber' --output text)
 if [ -z "${device}" ]; then
+  export AWS_PROFILE="${OLD_AWS_PROFILE}"
   echo "Can not find any MFA device for you."
-  return
+  exit 1
 fi
-
-if [ -z "$code" ]; then
-  echo "Your MFA device is:" ${device}
-  read -p "Enter your MFA code now: " code
-fi
+echo "Your MFA device is:  " "${device}"
+read -s -r -p "MFA code: " code
+echo ''
 
 # Use the MFA device to get a session token and query out the necessary credentials.
-output=$(aws sts get-session-token --serial-number "${device}" --query 'Credentials.[SecretAccessKey,AccessKeyId,SessionToken,Expiration]' --output text --token-code ${code})
+output=$(aws sts get-session-token --serial-number "${device}" --query 'Credentials.[SecretAccessKey,AccessKeyId,SessionToken,Expiration]' --output text --token-code "${code}")
+export AWS_PROFILE="${OLD_AWS_PROFILE}"
+
 secret=$(echo $output | cut -f1 -d ' ')
 access=$(echo $output | cut -f2 -d ' ')
 session=$(echo $output | cut -f3 -d ' ')
 expiration=$(echo $output | cut -f4 -d ' ')
 
-if [ -z "${secret}" -o -z "${session}" -o -z "${access}" ]; then
+if [ -z "${secret}" ] || [ -z "${session}" ] || [ -z "${access}" ]; then
   echo "Unable to get temporary credentials."
-  return
+  echo "Output: ${output}"
+  exit 1
 fi
 
-# Seed the credentials into a new temp default profile in .aws/credentials
-echo "[default]" > "${HOME}"/.aws/credentials
-echo "aws_access_key_id = ${access}" >> "${HOME}"/.aws/credentials
-echo "aws_secret_access_key = ${secret}" >> "${HOME}"/.aws/credentials
-echo "aws_session_token = ${session}" >> "${HOME}"/.aws/credentials
+SESSION_CREDENTIALS="export AWS_ACCESS_KEY_ID=${access}
+export AWS_SECRET_ACCESS_KEY=${secret}
+export AWS_SESSION_TOKEN=${session}
+export AWS_DEFAULT_REGION=us-east-1"
 
-echo "Keys are valid until ${expiration}"
-echo "Temporary credentials have been stored in ${HOME}/.aws/credentials"
+echo -e "Copy the following:
+${txtpurple}
+${SESSION_CREDENTIALS}
+${txtreset}"
 
-# Export the profile to use it by default
-export AWS_PROFILE=default    
+SESSION_FILE="${HOME}/.aws/${TMP_AWS_PROFILE}.session.env"
+echo "${SESSION_CREDENTIALS}" > "$SESSION_FILE"
+echo "Credentials saved in ${txtgreen}${SESSION_FILE}${txtreset}"
+echo "Created at:  $(date -u +%FT%T%Z)"
+echo "Valid until: ${txtred}${expiration}${txtreset}"
