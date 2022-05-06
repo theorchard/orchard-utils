@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Genearates temporary AWS credentials using your MFA device (12 hour duration).
+# Generates temporary AWS credentials using your MFA device (12 hour duration).
 # Usage: ./aws-session-login [profile_name]
 #  - or to be prompted to enter the profile -
 # ./aws-session-login
@@ -21,7 +21,7 @@ if [ ! -f "${HOME}"/.aws/credentials ]; then
     echo "There is no credentials file located in ${HOME}/.aws/credentials"
     exit 1
 fi
-TMP_PROFILE_LIST=( $(grep ^\[[a-z]*\] "$HOME/.aws/credentials" | sed 's/^\[//g' | sed 's/\]$//g' | uniq | tr '\n' ' ') )
+TMP_PROFILE_LIST=( $(grep "^\[[a-z]*\]" "$HOME/.aws/credentials" | sed 's/^\[//g' | sed 's/\]$//g' | uniq | tr '\n' ' ') )
 
 # Check if the profile name was passed as an argument
 if [ -n "${1}" ]; then
@@ -83,10 +83,10 @@ echo ''
 output=$(aws sts get-session-token --serial-number "${device}" --query 'Credentials.[SecretAccessKey,AccessKeyId,SessionToken,Expiration]' --output text --token-code "${code}")
 export AWS_PROFILE="${OLD_AWS_PROFILE}"
 
-secret=$(echo $output | cut -f1 -d ' ')
-access=$(echo $output | cut -f2 -d ' ')
-session=$(echo $output | cut -f3 -d ' ')
-expiration=$(echo $output | cut -f4 -d ' ')
+secret=$(echo "$output" | cut -f1 -d ' ')
+access=$(echo "$output" | cut -f2 -d ' ')
+session=$(echo "$output" | cut -f3 -d ' ')
+expiration=$(echo "$output" | cut -f4 -d ' ')
 
 if [ -z "${secret}" ] || [ -z "${session}" ] || [ -z "${access}" ]; then
   echo "Unable to get temporary credentials."
@@ -94,7 +94,8 @@ if [ -z "${secret}" ] || [ -z "${session}" ] || [ -z "${access}" ]; then
   exit 1
 fi
 
-SESSION_CREDENTIALS="export AWS_ACCESS_KEY_ID=${access}
+SESSION_CREDENTIALS="# expires: ${expiration}
+export AWS_ACCESS_KEY_ID=${access}
 export AWS_SECRET_ACCESS_KEY=${secret}
 export AWS_SESSION_TOKEN=${session}
 export AWS_DEFAULT_REGION=us-east-1"
