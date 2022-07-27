@@ -41,16 +41,13 @@ Select an AWS profile:
 Enter profile number:
 
 Profile found for:    myUserName
-Your MFA device is:   arn:aws:iam::437795906767:mfa/myUserName
+Your MFA device is:   arn:aws:iam::12345678910:mfa/myUserName
 # You will be prompted to enter your MFA code
 MFA code:
 
-Copy the following:
-# expires: 2022-05-07T03:47:44+00:00
-export AWS_ACCESS_KEY_ID={key id}
-export AWS_SECRET_ACCESS_KEY={access key}
-export AWS_SESSION_TOKEN={token}
-export AWS_DEFAULT_REGION={region}
+Copy and paste the following into your terminal:
+
+export AWS_ACCESS_KEY_ID={key id} AWS_SECRET_ACCESS_KEY={access key} AWS_SESSION_TOKEN={token} AWS_DEFAULT_REGION={region}
 ```
 
 You may optionally specify the profile name when running the command, e.g. `aws-session-login prod`
