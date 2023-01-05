@@ -32,7 +32,7 @@ if [ -f "${HOME}"/.aws/.store ]; then
   if [ "$overwrite_dot_store" == 'Y' ]; then
     mv "${HOME}"/.aws/credentials "${HOME}"/.aws/credentials.bak
     mv "${HOME}"/.aws/.store "${HOME}"/.aws/credentials
-    echo "Backed up old credentials file to ~/.aws/credentials."
+    echo "Backed up old credentials file to ~/.aws/credentials.bak"
     echo "Moved ~/.aws/.store to ~/.aws/credentials"
   else
     echo "WARNING: ~/.aws/.store file is present. This may mean that the contents of your credentials file are corrupted."
