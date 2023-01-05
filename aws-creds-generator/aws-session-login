@@ -28,7 +28,8 @@ fi
 # to correct the old behavior
 if [ -f "${HOME}"/.aws/.store ]; then
   echo "${txtred}A previous version of this script moved your credentials into a temporary file at ~/.aws/.store${txtreset}"
-  read -r -p "Permantently move ~/.aws/.store back to ~/.aws/credentials? (Y/n): " overwrite_dot_store
+  printf "Permantently move ~/.aws/.store back to ~/.aws/credentials? (Y/n): "
+  read -r overwrite_dot_store
   if [ "$overwrite_dot_store" == 'Y' ]; then
     mv "${HOME}"/.aws/credentials "${HOME}"/.aws/credentials.bak
     mv "${HOME}"/.aws/.store "${HOME}"/.aws/credentials
@@ -65,13 +66,17 @@ if [ -z "${TMP_AWS_PROFILE}" ]; then
       echo -e "$COUNTER) ${txtgreen}$i${txtreset}"
   done
   echo "-------------"
-  read -r -p "Enter profile number: " profile_index
-  ((profile_index=profile_index-1))
+  printf "Enter profile number: "
+  read -r profile_index
+  if [ ! -z "$TMP_PROFILE_LIST[0]" ]; then
+    ((profile_index=profile_index-1))
+  fi
   if [ "$profile_index" -lt 0 ] || [ -z "${TMP_PROFILE_LIST[$profile_index]}" ]; then
       echo "Selected profile does not exist"
       exit 1
   fi
   TMP_AWS_PROFILE="${TMP_PROFILE_LIST[$profile_index]}"
+  echo "Using profile: ${TMP_AWS_PROFILE}"
 fi
 export AWS_PROFILE="${TMP_AWS_PROFILE}"
 
@@ -91,7 +96,8 @@ if [ -z "${device}" ]; then
   exit 1
 fi
 echo "Your MFA device is:  " "${device}"
-read -s -r -p "MFA code: " code
+printf "MFA code: "
+read -r -s code
 echo ''
 
 # Use the MFA device to get a session token and query out the necessary credentials.
