@@ -1,21 +1,22 @@
-# aws-creds-generator
+# aws-session-login
 
-At The Orchard, we have Multi-factor Authentication (MFA) enforced for all IAM user accounts, and in order to use certain AWS services, we need confirm our identities whether using the console and/or using the AWS CLI, by logging in with an MFA token. The only thing the user needs to do is input an MFA token. The script will automatically generate temporary credentials that will last for 12 hours and provides the following:
-```
- - AWS ACCESS KEY
- - AWS SECRET ACCESS KEY
- - AWS SESSION TOKEN
-```
+In order for AWS users with Multi-Factor Authentication turned on to use certain AWS services, we need to log in with an MFA token. The script will walk you through generating temporary credentials that will last for 12 hours and provides an **AWS ACCESS KEY**, **AWS SECRET ACCESS KEY**, and **AWS SESSION TOKEN**
 
-You need to have the following files present with your AWS credentials in them:
-```
- - ~/.aws/credentials
- - ~/.aws/config
-```
+This script will manage:
 
-Your credentials file should have two profiles, one for our AWS Prod account, and another for the AWS Dev account. An example of how it should look:
-```
-[dev]
+- Identifying your IAM user account by reading your credentials file in ~/.aws/credentials.
+- Finding which MFA device you have attached to your account.
+- Prompts for an MFA token. (Enter the token using the authenticator attached to your AWS account)
+- Creating or replacing the file `~/.aws/{profile name}.session.env` containing the session credentials.
+
+## Prerequisites
+
+- [aws-cli](https://aws.amazon.com/cli/) (version 1 or 2, configured by running `aws configure`)
+
+Once configured, your credentials file should have one or more profiles, e.g. a file with a **default** and **prod** profile:
+
+```text
+[default]
 aws_access_key_id = foo
 aws_secret_access_key = foo
 
@@ -24,32 +25,37 @@ aws_access_key_id = boo
 aws_secret_access_key = boo
 ```
 
-Example use of this script:
-```
-. ./aws-session-login
+## Usage
+
+```sh
+$ aws-session-login
+
+Select an AWS profile:
+1) default
+2) dev
+3) prod
+4) service
+5) snowflake
+-------------
+# You can enter the number or name of the profile you want to login as
+Enter profile number:
+
+Profile found for:    myUserName
+Your MFA device is:   arn:aws:iam::12345678910:mfa/myUserName
+# You will be prompted to enter your MFA code
+MFA code:
+
+Copy and paste the following into your terminal:
+
+export AWS_ACCESS_KEY_ID={key id} AWS_SECRET_ACCESS_KEY={access key} AWS_SESSION_TOKEN={token} AWS_DEFAULT_REGION={region}
 ```
 
-You may supply an optional param for the profile name, rather than providing it interactively:
-```
-. ./aws-session-login prod
+You may optionally specify the profile name when running the command, e.g. `aws-session-login prod`
+
+Once the script has run, you can load the session credentials into your current shell by running the following command, where `{profile name}` is replaced with the profile you generated credentials for. If you open a new terminal session, remember to rerun this command:
+
+```sh
+. ~/.aws/{profile name}.session.env
 ```
 
-You may also supply an optional second param for the one-time auth token, rather than providing it interactively, e.g.:
-```
-. ./aws-session-login prod 123987
-```
-
-This script will create a new that will be stored as ```.store``` that will act as a master backup of your credentials. This will only be done if you're running this script for the first time. On subsequent uses of this script, it'll use that same ```.store``` file, and treat it the master source for your AWS credentials.
-
-If you open a new terminal session, remember to run the following in order to use the temporary credentials:
-```
-export AWS_PROFILE=default
-```
-
-This script will manage:
- - Identifying your IAM user account by reading your credentials file in ~/.aws/credentials.
- - Finding which MFA device you have attached to your account.
- - Prompts for an MFA token. (Enter the token using the authenticator attached to your AWS account)
- - Creating a backup of ~/.aws/credentials and renamed to ~/.aws/.store.
- - Creating a new credentials file with a [default] profile that has the generated credentials.
- - Exporting the default profile in the same shell session where you ran the script.
+You can reuse the credentials in this file until the expiration time has reached.
