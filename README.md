@@ -7,8 +7,8 @@ limited to, developing against our technology stack.
 
 ## Utilities
 
-- [AWS Session Login](./aws-creds-generator/)
-- [ECR Login](./ecr-login/)
+- [AWS Session Login](./aws-creds-generator)
+- [ECR Login](./ecr-login)
 
 ---
 
@@ -20,7 +20,7 @@ Requirements:
 - aws cli (v1 or v2)
 - brew
 
-Run the following to add theorchard's brew formulas to your brew taps:
+Run the following to add The Orchard's brew formulas to your brew taps:
 
 ```sh
 brew tap theorchard/theorchard
