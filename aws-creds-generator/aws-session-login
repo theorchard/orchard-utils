@@ -22,6 +22,23 @@ if [ ! -f "${HOME}"/.aws/credentials ]; then
     echo "There is no credentials file located in ${HOME}/.aws/credentials"
     exit 1
 fi
+
+# Older version of this tool moved your crentials into a temp file ~/.aws/.store
+# This version of the script won't overwrite your local files, and will attempt
+# to correct the old behavior
+if [ -f "${HOME}"/.aws/.store ]; then
+  echo "${txtred}A previous version of this script moved your credentials into a temporary file at ~/.aws/.store${txtreset}"
+  read -r -p "Permantently move ~/.aws/.store back to ~/.aws/credentials? (Y/n): " overwrite_dot_store
+  if [ "$overwrite_dot_store" == 'Y' ]; then
+    mv "${HOME}"/.aws/credentials "${HOME}"/.aws/credentials.bak
+    mv "${HOME}"/.aws/.store "${HOME}"/.aws/credentials
+    echo "Backed up old credentials file to ~/.aws/credentials."
+    echo "Moved ~/.aws/.store to ~/.aws/credentials"
+  else
+    echo "WARNING: ~/.aws/.store file is present. This may mean that the contents of your credentials file are corrupted."
+  fi
+fi
+
 TMP_PROFILE_LIST=( $(grep "^\[[a-z]*\]" "$HOME/.aws/credentials" | sed 's/^\[//g' | sed 's/\]$//g' | uniq | tr '\n' ' ') )
 
 # Check if the profile name was passed as an argument
