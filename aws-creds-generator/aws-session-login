@@ -30,7 +30,7 @@ if [ -f "${HOME}"/.aws/.store ]; then
   echo "${txtred}A previous version of this script moved your credentials into a temporary file at ~/.aws/.store${txtreset}"
   printf "Permantently move ~/.aws/.store back to ~/.aws/credentials? (Y/n): "
   read -r overwrite_dot_store
-  if [ "$overwrite_dot_store" == 'Y' ]; then
+  if [ "${overwrite_dot_store}" == 'Y' ]; then
     mv "${HOME}"/.aws/credentials "${HOME}"/.aws/credentials.bak
     mv "${HOME}"/.aws/.store "${HOME}"/.aws/credentials
     echo "Backed up old credentials file to ~/.aws/credentials.bak"
@@ -40,7 +40,7 @@ if [ -f "${HOME}"/.aws/.store ]; then
   fi
 fi
 
-TMP_PROFILE_LIST=( $(grep "^\[[a-z]*\]" "$HOME/.aws/credentials" | sed 's/^\[//g' | sed 's/\]$//g' | uniq | tr '\n' ' ') )
+TMP_PROFILE_LIST=( $(grep "^\[[a-z]*\]" "${HOME}/.aws/credentials" | sed 's/^\[//g' | sed 's/\]$//g' | uniq | tr '\n' ' ') )
 
 # Check if the profile name was passed as an argument
 if [ -n "${1}" ]; then
@@ -63,19 +63,19 @@ if [ -z "${TMP_AWS_PROFILE}" ]; then
   COUNTER=0
   for i in "${TMP_PROFILE_LIST[@]}"; do
       ((COUNTER=COUNTER+1))
-      echo -e "$COUNTER) ${txtgreen}$i${txtreset}"
+      echo -e "${COUNTER}) ${txtgreen}${i}${txtreset}"
   done
   echo "-------------"
   printf "Enter profile number: "
   read -r profile_index
-  if [ ! -z "$TMP_PROFILE_LIST[0]" ]; then
+  if [ -n "${TMP_PROFILE_LIST[0]}" ]; then
     ((profile_index=profile_index-1))
   fi
-  if [ "$profile_index" -lt 0 ] || [ -z "${TMP_PROFILE_LIST[$profile_index]}" ]; then
+  if [ "${profile_index}" -lt 0 ] || [ -z "${TMP_PROFILE_LIST[${profile_index}]}" ]; then
       echo "Selected profile does not exist"
       exit 1
   fi
-  TMP_AWS_PROFILE="${TMP_PROFILE_LIST[$profile_index]}"
+  TMP_AWS_PROFILE="${TMP_PROFILE_LIST[${profile_index}]}"
   echo "Using profile: ${TMP_AWS_PROFILE}"
 fi
 export AWS_PROFILE="${TMP_AWS_PROFILE}"
@@ -107,10 +107,10 @@ output=$(
     --query 'Credentials.[SecretAccessKey,AccessKeyId,SessionToken,Expiration]' \
     --output text \
     --token-code "${code}" | tr '\t' ' ')
-secret=$(echo "$output" | cut -f1 -d ' ')
-access=$(echo "$output" | cut -f2 -d ' ')
-session=$(echo "$output" | cut -f3 -d ' ')
-expiration=$(echo "$output" | cut -f4 -d ' ')
+secret=$(echo "${output}" | cut -f1 -d ' ')
+access=$(echo "${output}" | cut -f2 -d ' ')
+session=$(echo "${output}" | cut -f3 -d ' ')
+expiration=$(echo "${output}" | cut -f4 -d ' ')
 
 if [ -z "${secret}" ] || [ -z "${session}" ] || [ -z "${access}" ]; then
   echo "Unable to get temporary credentials."
@@ -124,9 +124,10 @@ echo -e "Copy and paste the following into your terminal:\n"
 echo -e "${txtpurple}${SESSION_CREDENTIALS}${txtreset}\n"
 
 SESSION_FILE="${HOME}/.aws/${TMP_AWS_PROFILE}.session.env"
-echo "# expires ${expiration}" > "$SESSION_FILE"
-echo "${SESSION_CREDENTIALS}" >> "$SESSION_FILE"
+echo "# expires ${expiration}" > "${SESSION_FILE}"
+echo "${SESSION_CREDENTIALS}" >> "${SESSION_FILE}"
 echo "Credentials saved in file ${txtblue}${SESSION_FILE}${txtreset}"
 
 echo "To load credentials in a new terminal, run the command: \"${txtblue}. ${SESSION_FILE}${txtreset}\""
-echo "Created at: $(date -u +%FT%T%Z). ${txtred}Valid until: ${expiration}${txtreset}"
+CREATED_DATE=$(date -u +%FT%T%Z)
+echo "Created at: ${CREATED_DATE}. ${txtred}Valid until: ${expiration}${txtreset}"
