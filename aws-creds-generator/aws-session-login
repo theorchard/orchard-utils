@@ -24,21 +24,22 @@ if [ ! -f "${HOME}"/.aws/credentials ]; then
     exit 1
 fi
 
-# Older version of this tool moved your crentials into a temp file ~/.aws/.store
+# Older version of this tool moved your credentials into a temp file ~/.aws/.store
 # This version of the script won't overwrite your local files, and will attempt
 # to correct the old behavior
 if [ -f "${HOME}"/.aws/.store ]; then
   echo "${txtorange}###### WARNING ######${txtreset}"
   echo "${txtorange}A previous version of this script moved your credentials into a temporary file at ~/.aws/.store${txtreset}"
-  printf "Permantently move ~/.aws/.store back to ~/.aws/credentials? (y/N): "
+  printf "Permanently move ~/.aws/.store back to ~/.aws/credentials? (y/N): "
   read -r overwrite_dot_store
   if [ "${overwrite_dot_store}" = 'y' ]; then
     mv "${HOME}"/.aws/credentials "${HOME}"/.aws/credentials.bak
     mv "${HOME}"/.aws/.store "${HOME}"/.aws/credentials
-    echo "Backed up old credentials file to ~/.aws/credentials.bak"
-    echo "Moved ~/.aws/.store to ~/.aws/credentials"
+    echo "${txtgreen}Success! Moved ~/.aws/.store to ~/.aws/credentials. Backed up old credentials file to ~/.aws/credentials.bak${txtreset}"
+    echo ""
   else
     echo "${txtorange}WARNING: ~/.aws/.store file is still present. This may mean that the contents of your credentials file are corrupted.${txtreset}"
+    echo ""
   fi
 fi
 
@@ -65,11 +66,12 @@ if [ -z "${TMP_AWS_PROFILE}" ]; then
   COUNTER=0
   for i in "${TMP_PROFILE_LIST[@]}"; do
       ((COUNTER=COUNTER+1))
-      echo -e "${COUNTER}) ${txtgreen}${i}${txtreset}"
+      echo "${COUNTER}) ${txtblue}${i}${txtreset}"
   done
   echo "-------------"
   printf "Enter profile number: "
   read -r profile_index
+  echo ""
   if [ -n "${TMP_PROFILE_LIST[0]}" ]; then
     ((profile_index=profile_index-1))
   fi
@@ -78,7 +80,7 @@ if [ -z "${TMP_AWS_PROFILE}" ]; then
       exit 1
   fi
   TMP_AWS_PROFILE="${TMP_PROFILE_LIST[${profile_index}]}"
-  echo "Using profile: ${TMP_AWS_PROFILE}"
+  echo "Profile:    ${txtpurple}${TMP_AWS_PROFILE}${txtreset}"
 fi
 export AWS_PROFILE="${TMP_AWS_PROFILE}"
 
@@ -89,7 +91,7 @@ then
   echo "Cannot get profile name."
   exit 1
 fi
-echo "Profile found for:    ${txtgreen}${username}${txtreset}"
+echo "Username:   ${txtpurple}${username}${txtreset}"
 
 # Query IAM to get the user's MFA device
 device=$(aws iam list-mfa-devices --user-name "${username}" --query 'MFADevices[*].SerialNumber' --output text)
@@ -97,9 +99,10 @@ if [ -z "${device}" ]; then
   echo "Can not find any MFA device for you."
   exit 1
 fi
-echo "Your MFA device is:  " "${device}"
+echo "MFA device: ${txtpurple}${device}${txtreset}"
+echo ""
 printf "MFA code: "
-read -r -s code
+read -r code
 echo ''
 
 # Use the MFA device to get a session token and query out the necessary credentials.
@@ -121,15 +124,13 @@ if [ -z "${secret}" ] || [ -z "${session}" ] || [ -z "${access}" ]; then
 fi
 
 SESSION_CREDENTIALS="export AWS_ACCESS_KEY_ID=${access} AWS_SECRET_ACCESS_KEY=${secret} AWS_SESSION_TOKEN=${session} AWS_DEFAULT_REGION=us-east-1"
-echo -e "\n${txtgreen}Login Sucessful!${txtreset}\n"
-echo -e "Copy and paste the following into your terminal:\n"
-echo -e "${txtpurple}${SESSION_CREDENTIALS}${txtreset}\n"
-
 SESSION_FILE="${HOME}/.aws/${TMP_AWS_PROFILE}.session.env"
 echo "# expires ${expiration}" > "${SESSION_FILE}"
 echo "${SESSION_CREDENTIALS}" >> "${SESSION_FILE}"
-echo "Credentials saved in file ${txtblue}${SESSION_FILE}${txtreset}"
 
-echo "To load credentials in a new terminal, run the command: \"${txtblue}. ${SESSION_FILE}${txtreset}\""
 CREATED_DATE=$(date -u +%FT%T%Z)
-echo "Created at: ${CREATED_DATE}. ${txtred}Valid until: ${expiration}${txtreset}"
+echo "${txtgreen}Login Successful! Credentials saved in file ${SESSION_FILE}"
+echo "Created at ${CREATED_DATE}, Valid until ${expiration}${txtreset}"
+echo ""
+echo "${txtred}IMPORTANT!${txtreset} Run this command to use this session: ${txtblue}. ~/.aws/${TMP_AWS_PROFILE}.session.env${txtreset}"
+echo ""
