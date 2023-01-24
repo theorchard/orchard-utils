@@ -7,6 +7,7 @@
 
 txtred=$(tput setaf 1)
 txtgreen=$(tput setaf 2)
+txtorange=$(tput setaf 3)
 txtblue=$(tput setaf 4)
 txtpurple=$(tput setaf 5)
 txtreset=$(tput sgr0)
@@ -27,16 +28,17 @@ fi
 # This version of the script won't overwrite your local files, and will attempt
 # to correct the old behavior
 if [ -f "${HOME}"/.aws/.store ]; then
-  echo "${txtred}A previous version of this script moved your credentials into a temporary file at ~/.aws/.store${txtreset}"
-  printf "Permantently move ~/.aws/.store back to ~/.aws/credentials? (Y/n): "
+  echo "${txtorange}###### WARNING ######${txtreset}"
+  echo "${txtorange}A previous version of this script moved your credentials into a temporary file at ~/.aws/.store${txtreset}"
+  printf "Permantently move ~/.aws/.store back to ~/.aws/credentials? (y/N): "
   read -r overwrite_dot_store
-  if [ "${overwrite_dot_store}" == 'Y' ]; then
+  if [ "${overwrite_dot_store}" == 'y' ]; then
     mv "${HOME}"/.aws/credentials "${HOME}"/.aws/credentials.bak
     mv "${HOME}"/.aws/.store "${HOME}"/.aws/credentials
     echo "Backed up old credentials file to ~/.aws/credentials.bak"
     echo "Moved ~/.aws/.store to ~/.aws/credentials"
   else
-    echo "WARNING: ~/.aws/.store file is present. This may mean that the contents of your credentials file are corrupted."
+    echo "${txtorange}WARNING: ~/.aws/.store file is still present. This may mean that the contents of your credentials file are corrupted.${txtreset}"
   fi
 fi
 

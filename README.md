@@ -1,26 +1,19 @@
 # orchard-utils
 
-A collection of generic helper utilities that are useful for, but not
-limited to, developing against our technology stack.
+Utilities to help automate common tasks when developing against our technology stack.
 
 ---
 
 ## Utilities
 
-- [AWS Session Login](./aws-creds-generator)
-- [ECR Login](./ecr-login)
+- [AWS Session Login](./aws-creds-generator) - Generate session credentials for AWS using MFA
+- [ECR Login](./ecr-login) - Log into ECR to enable pulling/pushing docker images
 
 ---
 
-## Installation Using Brew (under development)
+## Installation Using Brew
 
-Requirements:
-
-- python3
-- aws cli (v1 or v2)
-- brew
-
-Run the following to add The Orchard's brew formulas to your brew taps:
+Run the following command to add The Orchard's brew formulas to your brew taps:
 
 ```sh
 brew tap theorchard/theorchard
@@ -32,10 +25,21 @@ To install the utilities:
 brew install orchard-utils --build-bottle
 ```
 
+That's it! Now each utility should be available in the command line by typing its name. For example `$ aws-sessions-login`.
+
 ---
+
+## Contributing
+
+Everyone is encouraged to their own utilities or improvements to existing utilities. You can create a PR by following these guidelines:
+
+- New utilities should automate common tasks that engineers perform
+- Utilities should be fully documented, and offer clear instructions to users.
+- This is an open source project, so code shouldn't refer to specific orchard resources
+- Updates must be tested against multiple environments, including `bash` and `zsh` on intel and m1 processors
+- `shellcheck` linting should be run against PRs
 
 ## Possible Improvements
 
-- Complete brew install setup
 - Add PR test job
 - Automate releases
