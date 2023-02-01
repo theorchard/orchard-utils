@@ -5,6 +5,20 @@
 #  - or to be prompted to enter the profile -
 # ./aws-session-login
 
+HelpText() {
+  echo "Generate AWS session credentials using an MFA device."
+  echo ""
+  echo "SYNTAX:    aws-session-login [-j] [profileName] [mfaCode]"
+  echo ""
+  echo "OPTIONS"
+  echo "         -j   Preserve the old Jerry script behavior of moving"
+  echo "              and overwriting the AWS credentials file"
+  echo ""
+  echo "PARAMETERS"
+  echo "         profileName   Local profile name from AWS credentials file"
+  echo "         mfaCode       MFA code for the profile"
+}
+
 txtred=$(tput setaf 1)
 txtgreen=$(tput setaf 2)
 txtorange=$(tput setaf 3)
@@ -18,46 +32,80 @@ unset AWS_SECRET_ACCESS_KEY
 unset AWS_SESSION_TOKEN
 unset AWS_DEFAULT_REGION
 
+# Read options and parameters
+USE_LEGACY_FLAG=false
+while getopts ":j" opt; do
+  case $opt in
+    j)
+      USE_LEGACY_FLAG=true
+      shift $((OPTIND - 1))
+      ;;
+    \?)
+      HelpText
+      exit 1
+      ;;
+  esac
+done
+PROFILE_NAME=$1
+MFA_CODE=$2
+
+OLD_STORE_FILE="${HOME}/.aws/.store"
+AWS_CREDENTIALS_FILE="${HOME}/.aws/credentials"
+
 # Load the known aws profiles
-if [ ! -f "${HOME}"/.aws/credentials ]; then
-    echo "There is no credentials file located in ${HOME}/.aws/credentials"
-    exit 1
+if [ ! -f "${AWS_CREDENTIALS_FILE}" ]; then
+  echo "There is no credentials file located in ${AWS_CREDENTIALS_FILE}"
+  exit 1
 fi
 
 # Older version of this tool moved your credentials into a temp file ~/.aws/.store
-# This version of the script won't overwrite your local files, and will attempt
-# to correct the old behavior
-if [ -f "${HOME}"/.aws/.store ]; then
+# Unless the legacy behavior is requested with the -j flag, this version of the
+# script won't overwrite your local files and will attempt to correct the old behavior
+if [ "${USE_LEGACY_FLAG}" = "false" ] && [ -f "${OLD_STORE_FILE}" ]; then
   echo "${txtorange}###### WARNING ######${txtreset}"
   echo "${txtorange}A previous version of this script moved your credentials into a temporary file at ~/.aws/.store${txtreset}"
   printf "Permanently move ~/.aws/.store back to ~/.aws/credentials? (y/N): "
   read -r overwrite_dot_store
   if [ "${overwrite_dot_store}" = 'y' ]; then
-    mv "${HOME}"/.aws/credentials "${HOME}"/.aws/credentials.bak
-    mv "${HOME}"/.aws/.store "${HOME}"/.aws/credentials
+    mv "${AWS_CREDENTIALS_FILE}" "${AWS_CREDENTIALS_FILE}.bak"
+    mv "${OLD_STORE_FILE}" "${AWS_CREDENTIALS_FILE}"
     echo "${txtgreen}Success! Moved ~/.aws/.store to ~/.aws/credentials. Backed up old credentials file to ~/.aws/credentials.bak${txtreset}"
     echo ""
   else
     echo "${txtorange}WARNING: ~/.aws/.store file is still present. This may mean that the contents of your credentials file are corrupted.${txtreset}"
+    echo "${txtorange}Try running this script with the -j flag to use the old behavior.${txtreset}"
     echo ""
   fi
 fi
 
-TMP_PROFILE_LIST=( $(grep "^\[[a-z]*\]" "${HOME}/.aws/credentials" | sed 's/^\[//g' | sed 's/\]$//g' | uniq | tr '\n' ' ') )
+PROFILE_FILE="${AWS_CREDENTIALS_FILE}"
+if [ "${USE_LEGACY_FLAG}" = "true" ]; then
+  if [ ! -f "${OLD_STORE_FILE}" ]; then
+    cp "${AWS_CREDENTIALS_FILE}" "${OLD_STORE_FILE}"
+  fi
+  PROFILE_FILE="${OLD_STORE_FILE}"
+fi
 
+TMP_PROFILE_LIST=( $(grep "^\[[a-z]*\]" "${PROFILE_FILE}" | sed 's/^\[//g' | sed 's/\]$//g' | uniq | tr '\n' ' ') )
+if [ "${#TMP_PROFILE_LIST[@]}" = "1" ]; then
+  PROFILE_NAME=${TMP_PROFILE_LIST[0]}
+  if [ -z "${PROFILE_NAME}" ]; then
+    PROFILE_NAME=${TMP_PROFILE_LIST[1]}
+  fi
+fi
 # Check if the profile name was passed as an argument
-if [ -n "${1}" ]; then
-  FOUND_IN_LIST=0
+if [ -n "${PROFILE_NAME}" ]; then
+  FOUND_IN_LIST=false
   for i in "${TMP_PROFILE_LIST[@]}"; do
-    if [ "${i}" = "${1}" ]; then
+    if [ "${i}" = "${PROFILE_NAME}" ]; then
       FOUND_IN_LIST=true
     fi
   done
   if [ "${FOUND_IN_LIST}" != true ]; then
-    echo "AWS profile '${1}' not found."
+    echo "AWS profile '${PROFILE_NAME}' not found."
     exit 1
   fi
-  TMP_AWS_PROFILE="${1}"
+  TMP_AWS_PROFILE="${PROFILE_NAME}"
 fi
 
 if [ -z "${TMP_AWS_PROFILE}" ]; then
@@ -80,8 +128,8 @@ if [ -z "${TMP_AWS_PROFILE}" ]; then
       exit 1
   fi
   TMP_AWS_PROFILE="${TMP_PROFILE_LIST[${profile_index}]}"
-  echo "Profile:    ${txtpurple}${TMP_AWS_PROFILE}${txtreset}"
 fi
+echo "Profile:    ${txtpurple}${TMP_AWS_PROFILE}${txtreset}"
 export AWS_PROFILE="${TMP_AWS_PROFILE}"
 
 # Query IAM to get the username associated with the keys in the credentials file
@@ -101,9 +149,13 @@ if [ -z "${device}" ]; then
 fi
 echo "MFA device: ${txtpurple}${device}${txtreset}"
 echo ""
-printf "MFA code: "
-read -r code
-echo ''
+
+# Get the MFA code from the user if it wasn't passed as a parameter
+if [ -z "${MFA_CODE}" ]; then
+  printf "MFA code: "
+  read -r MFA_CODE
+  echo ''
+fi
 
 # Use the MFA device to get a session token and query out the necessary credentials.
 output=$(
@@ -111,26 +163,41 @@ output=$(
     --serial-number "${device}" \
     --query 'Credentials.[SecretAccessKey,AccessKeyId,SessionToken,Expiration]' \
     --output text \
-    --token-code "${code}" | tr '\t' ' ')
+    --token-code "${MFA_CODE}" | tr '\t' ' ')
 secret=$(echo "${output}" | cut -f1 -d ' ')
 access=$(echo "${output}" | cut -f2 -d ' ')
 session=$(echo "${output}" | cut -f3 -d ' ')
 expiration=$(echo "${output}" | cut -f4 -d ' ')
-
 if [ -z "${secret}" ] || [ -z "${session}" ] || [ -z "${access}" ]; then
   echo "Unable to get temporary credentials."
   echo "Output: ${output}"
   exit 1
 fi
 
-SESSION_CREDENTIALS="export AWS_ACCESS_KEY_ID=${access} AWS_SECRET_ACCESS_KEY=${secret} AWS_SESSION_TOKEN=${session} AWS_DEFAULT_REGION=us-east-1"
-SESSION_FILE="${HOME}/.aws/${TMP_AWS_PROFILE}.session.env"
-echo "# expires ${expiration}" > "${SESSION_FILE}"
-echo "${SESSION_CREDENTIALS}" >> "${SESSION_FILE}"
+# Write out the credentials to the filesystem
+if [ "${USE_LEGACY_FLAG}" = "true" ]; then
+  SESSION_FILE_NAME=credentials
+  cat > "${AWS_CREDENTIALS_FILE}" <<- HEREDOC
+# Expires ${expiration}
+[default]
+aws_access_key_id=${access}
+aws_secret_access_key=${secret}
+aws_session_token=${session}
+HEREDOC
+else
+  SESSION_CREDENTIALS="export AWS_ACCESS_KEY_ID=${access} AWS_SECRET_ACCESS_KEY=${secret} AWS_SESSION_TOKEN=${session} AWS_DEFAULT_REGION=us-east-1"
+  SESSION_FILE_NAME="${TMP_AWS_PROFILE}.session.env"
+  SESSION_FILE_PATH="${HOME}/.aws/${SESSION_FILE_NAME}"
+  echo "# expires ${expiration}" > "${SESSION_FILE_PATH}"
+  echo "${SESSION_CREDENTIALS}" >> "${SESSION_FILE_PATH}"
+fi
 
 CREATED_DATE=$(date -u +%FT%T%Z)
-echo "${txtgreen}Login Successful! Credentials saved in file ${SESSION_FILE}"
+echo "${txtgreen}Login Successful! Credentials saved in file ~/.aws/${SESSION_FILE_NAME}"
 echo "Created at ${CREATED_DATE}, Valid until ${expiration}${txtreset}"
 echo ""
-echo "${txtred}IMPORTANT!${txtreset} Run this command to use this session: ${txtblue}. ~/.aws/${TMP_AWS_PROFILE}.session.env${txtreset}"
-echo ""
+
+if [ "${USE_LEGACY_FLAG}" = "false" ]; then
+  echo "${txtred}IMPORTANT!${txtreset} Run this command to use this session: ${txtblue}. ~/.aws/${SESSION_FILE_NAME}${txtreset}"
+  echo ""
+fi
