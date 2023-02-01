@@ -2,60 +2,31 @@
 
 In order for AWS users with Multi-Factor Authentication turned on to use certain AWS services, we need to log in with an MFA token. The script will walk you through generating temporary credentials that will last for 12 hours and provides an **AWS ACCESS KEY**, **AWS SECRET ACCESS KEY**, and **AWS SESSION TOKEN**
 
-This script will manage:
-
-- Identifying your IAM user account by reading your credentials file in ~/.aws/credentials.
-- Finding which MFA device you have attached to your account.
-- Prompts for an MFA token. (Enter the token using the authenticator attached to your AWS account)
-- Creating or replacing the file `~/.aws/{profile name}.session.env` containing the session credentials.
-
 ## Prerequisites
 
 - [aws-cli](https://aws.amazon.com/cli/) (version 1 or 2, configured by running `aws configure`)
 
-Once configured, your credentials file should have one or more profiles, e.g. a file with a **default** and **prod** profile:
-
-```text
-[default]
-aws_access_key_id = foo
-aws_secret_access_key = foo
-
-[prod]
-aws_access_key_id = boo
-aws_secret_access_key = boo
-```
-
 ## Usage
 
 ```sh
-$ aws-session-login
+aws-session-login [-j] [profileName] [mfaCode]
 
-Select an AWS profile:
-1) default
-2) dev
-3) prod
-4) service
-5) snowflake
--------------
-# You can enter the number or name of the profile you want to login as
-Enter profile number:
-
-Profile found for:    myUserName
-Your MFA device is:   arn:aws:iam::12345678910:mfa/myUserName
-# You will be prompted to enter your MFA code
-MFA code:
-
-Copy and paste the following into your terminal:
-
-export AWS_ACCESS_KEY_ID={key id} AWS_SECRET_ACCESS_KEY={access key} AWS_SESSION_TOKEN={token} AWS_DEFAULT_REGION={region}
+examples:
+aws-session-login
+aws-session-login default
+aws-session-login prod 512382
+aws-session-login -j dev
 ```
 
-You may optionally specify the profile name when running the command, e.g. `aws-session-login prod`
+`profileName` and `mfaCode` are optional parameters that the script will prompt you for if not included in the command call.
 
-Once the script has run, you can load the session credentials into your current shell by running the following command, where `{profile name}` is replaced with the profile you generated credentials for. If you open a new terminal session, remember to rerun this command:
+The `-j` flag (Jerry's Script Mode) will move your `~/.aws/credentials` to `~/.aws/.store` and overwrite the `credentials`
+file with your temporary session creds. If this option is omitted, your `credentials` file will not be altered and
+the generated session credentials will be written to a file named after the selected profile: `~/.aws/{profileName}.session.env`.
 
-```sh
-. ~/.aws/{profile name}.session.env
-```
+You can generate multiple profile session credentials through subsequent calls to this command and all will remain valid until
+their expiration time.
 
-You can reuse the credentials in this file until the expiration time has reached.
+When not using the `-j` flag, you will need to add the session credentials to your env in any terminal/shell you wish to
+use the session credentials in. This can be accomplished via the command `. ~/.aws/{profileName}.session.env` where
+`profileName` is the name of the profile you used to generate the creds (note the `.` preceding the path to the creds file)
